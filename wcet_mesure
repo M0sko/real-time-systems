@@ -1,0 +1,33 @@
+import time, ctypes, subprocess, os, random as rd, numpy as np
+
+# We automatically compile the C code into a shared library
+subprocess.run(["gcc", "-fPIC", "-shared", "-o", "multiplication.so", "multiplication.c"])
+
+# We load the shared library and specify the argument and return types of the function
+lib = ctypes.CDLL(os.path.abspath("./multiplication.so"))
+lib.multiply.argtypes = [ctypes.c_uint64, ctypes.c_uint64]
+lib.multiply.restype = ctypes.c_uint64
+
+# We measure the execution time of the function multiple times and take the maximum as the WCET
+print("Measuring WCET...")
+timings = []
+for _ in range(50000): # Number of iterations to get a good estimate of WCET 
+    a = rd.getrandbits(64)
+    b = rd.getrandbits(64)
+    start = time.perf_counter()
+    lib.multiply(a, b) # Call the C function to be measured
+    timings.append((time.perf_counter() - start) * 1000) # ms
+
+wcet_mesure = max(timings) # Worst Case Execution Time (WCET) in milliseconds
+
+print(f"{'Metric':<25} | {'Value':<15}")
+print("-" * 45)
+print(f"{'WCET (Worst Case)':<25} | {wcet_mesure:>8.4f} ms")
+print(f"{'WCET + 20% margin':<25} | {wcet_mesure * 1.2:>8.4f} ms")
+print(f"{'Average Timing':<25} | {np.mean(timings):>8.4f} ms")
+print(f"{'Minimum Timing':<25} | {min(timings):>8.4f} ms")  
+print("-" * 45)
+print(f"{'First Quantile (Q1)':<25} | {np.percentile(timings, 25):>8.4f} ms")
+print(f"{'Second Quantile (Median)':<25} | {np.median(timings):>8.4f} ms")
+print(f"{'Third Quantile (Q3)':<25} | {np.percentile(timings, 75):>8.4f} ms")
+print("="*45)
